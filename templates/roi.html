@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block content %}
+<h2 class="fw-bold mb-3">ROI Studio</h2>
+<div class="row g-3">
+  <div class="col-lg-6">
+    <div class="card card-soft p-3">
+      <form method="post" class="row g-2">
+        <div class="col-md-6">
+          <label class="form-label">Contact</label>
+          <select name="contact_id" class="form-select">
+            {% for c in contacts %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Project</label>
+          <select name="project_id" class="form-select">
+            {% for p in projects %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Purchase Price</label>
+          <input name="purchase_price" class="form-control" value="65000000" required>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Years</label>
+          <input name="years" class="form-control" value="3" required>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Growth % / year</label>
+          <input name="growth_rate" class="form-control" value="18" required>
+        </div>
+        <div class="col-12">
+          <button class="btn btn-primary">Calculate ROI</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card card-soft p-3">
+      <h5>Result</h5>
+      {% if result %}
+        <div class="display-6 fw-bold">₹ {{ "{:,.0f}".format(result.expected_exit_value) }}</div>
+        <div class="text-muted mb-3">Expected exit value</div>
+        <div class="row">
+          <div class="col-6">
+            <div class="p-3 bg-white rounded-4">
+              <div class="text-muted small">Profit</div>
+              <div class="fw-bold">₹ {{ "{:,.0f}".format(result.profit) }}</div>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="p-3 bg-white rounded-4">
+              <div class="text-muted small">IRR</div>
+              <div class="fw-bold">{{ result.irr }}%</div>
+            </div>
+          </div>
+        </div>
+      {% else %}
+        <p class="text-muted mb-0">Run a calculation to see results.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

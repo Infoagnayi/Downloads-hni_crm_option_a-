@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block content %}
+<h2 class="fw-bold mb-3">Inbox</h2>
+<div class="row g-3">
+  <div class="col-lg-4">
+    <div class="card card-soft p-2">
+      {% for c in conversations %}
+        <a class="text-decoration-none text-dark" href="{{ url_for('inbox', conversation_id=c.id) }}">
+          <div class="p-3 border-bottom {% if selected and selected.id == c.id %}bg-light{% endif %}">
+            <div class="d-flex justify-content-between">
+              <div class="fw-semibold">{{ c.contact_name }}</div>
+              <span class="badge badge-soft">{{ c.hni_score }}</span>
+            </div>
+            <div class="small text-muted">{{ c.city }}</div>
+            <div class="small mt-1">{{ c.last_message }}</div>
+          </div>
+        </a>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="col-lg-5">
+    <div class="card card-soft p-3">
+      {% if selected %}
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <div>
+            <div class="fw-bold">{{ selected.contact_name }}</div>
+            <div class="small text-muted">{{ selected.city }} · {{ selected.budget_band }} · {{ selected.buyer_type }}</div>
+          </div>
+          <span class="badge badge-soft">Score {{ selected.hni_score }}</span>
+        </div>
+        <div class="inbox-thread mb-3">
+          {% for m in messages %}
+            <div class="msg {{ m.sender }}">
+              <div class="small text-muted text-capitalize mb-1">{{ m.sender }}</div>
+              <div>{{ m.message_text }}</div>
+            </div>
+          {% endfor %}
+        </div>
+        <form method="post" action="{{ url_for('send_message', conversation_id=selected.id) }}">
+          <div class="input-group">
+            <input name="message_text" class="form-control" placeholder="Type message">
+            <button class="btn btn-primary">Send</button>
+          </div>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+  <div class="col-lg-3">
+    <div class="card card-soft p-3">
+      <h5>AI Suggestion</h5>
+      {% if ai_suggestion %}
+      <div class="bg-white p-3 rounded-4">{{ ai_suggestion }}</div>
+      <form method="post" action="{{ url_for('send_message', conversation_id=selected.id) }}" class="mt-2">
+        <input type="hidden" name="message_text" value="{{ ai_suggestion }}">
+        <button class="btn btn-outline-primary w-100">Send suggestion</button>
+      </form>
+      {% else %}
+      <p class="text-muted">Open a thread to see suggestion.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

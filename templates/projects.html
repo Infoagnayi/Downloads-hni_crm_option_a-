@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block content %}
+<h2 class="fw-bold mb-3">Projects</h2>
+<div class="row g-3">
+{% for p in projects %}
+  <div class="col-lg-4">
+    <div class="card card-soft p-3 h-100">
+      <div class="fw-bold">{{ p.name }}</div>
+      <div class="text-muted mb-2">{{ p.developer }} · {{ p.location }}</div>
+      <div class="small mb-2"><strong>Ticket:</strong> {{ p.ticket_size }}</div>
+      <div class="small mb-2"><strong>ROI:</strong> {{ p.expected_roi }}</div>
+      <div class="small">{{ p.appreciation_thesis }}</div>
+    </div>
+  </div>
+{% endfor %}
+</div>
+{% endblock %}
