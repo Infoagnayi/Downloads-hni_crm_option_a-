@@ -43,18 +43,22 @@
       </thead>
       <tbody>
         {% for c in contacts %}
-          <tr>
-            <td>{{ c.name }}</td>
-            <td>{{ c.phone }}</td>
-            <td>{{ c.city }}</td>
-            <td>{{ c.buyer_type }}</td>
-            <td>{{ c.budget_band }}</td>
-            <td>{{ c.consent_status }}</td>
-            <td><span class="badge badge-soft">{{ c.hni_score }}</span></td>
-            <td>{{ c.status }}</td>
-            <td>{{ c.tags }}</td>
-          </tr>
-        {% endfor %}
+         <tr>
+  <td>{{ c.name }}</td>
+  <td>{{ c.phone }}</td>
+  <td>{{ c.city }}</td>
+  <td>{{ c.buyer_type }}</td>
+  <td>{{ c.budget_band }}</td>
+  <td>{{ c.consent_status }}</td>
+  <td><span class="badge badge-soft">{{ c.hni_score }}</span></td>
+  <td>{{ c.status }}</td>
+  <td>{{ c.tags }}</td>
+  <td>
+    <form method="post" action="{{ url_for('delete_contact', contact_id=c.id) }}" onsubmit="return confirm('Delete this contact?');">
+      <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+    </form>
+  </td>
+</tr>        {% endfor %}
       </tbody>
     </table>
   </div>
