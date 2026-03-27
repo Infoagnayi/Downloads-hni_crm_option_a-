@@ -500,3 +500,27 @@ def roi():
 if __name__ == "__main__":
     init_db()
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+@app.route("/contacts/delete/<int:contact_id>", methods=["POST"])
+def delete_contact(contact_id):
+    if not require_login():
+        return redirect(url_for("login"))
+
+    conn = get_db()
+    c = conn.cursor()
+
+    # delete related records first
+    c.execute("SELECT id FROM conversations WHERE contact_id=?", (contact_id,))
+    convs = c.fetchall()
+
+    for conv in convs:
+        conv_id = conv["id"] if hasattr(conv, "keys") else conv[0]
+        c.execute("DELETE FROM messages WHERE conversation_id=?", (conv_id,))
+
+    c.execute("DELETE FROM conversations WHERE contact_id=?", (contact_id,))
+    c.execute("DELETE FROM contacts WHERE id=?", (contact_id,))
+
+    conn.commit()
+    conn.close()
+
+    flash("Contact deleted successfully.")
+    return redirect(url_for("contacts"))
