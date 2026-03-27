@@ -240,29 +240,43 @@ def contacts():
 def contacts_import():
     if not require_login():
         return redirect(url_for("login"))
+
     preview = []
     imported = None
+
     if request.method == "POST":
         file = request.files.get("csv_file")
         if not file:
             flash("Please upload a CSV file.")
             return redirect(url_for("contacts_import"))
+
         content = file.read().decode("utf-8", errors="ignore")
         stream = io.StringIO(content)
         reader = csv.DictReader(stream)
         rows = list(reader)
-        action = request.form.get("action","preview")
+
+        action = request.form.get("action", "").strip().lower()
+        print("ACTION:", action)
+        print("TOTAL ROWS READ:", len(rows))
+
         if action == "preview":
             preview = rows[:10]
-        else:
+
+        elif action == "import":
             conn = get_db()
             c = conn.cursor()
             count = 0
+            skipped_missing = 0
+            skipped_duplicate = 0
+
             for row in rows:
                 name = (row.get("name") or row.get("Name") or "").strip()
                 phone = (row.get("phone") or row.get("Phone") or "").strip()
+
                 if not name or not phone:
+                    skipped_missing += 1
                     continue
+
                 city = (row.get("city") or row.get("City") or "").strip()
                 email = (row.get("email") or row.get("Email") or "").strip()
                 source = (row.get("source") or row.get("Source") or "CSV Upload").strip()
@@ -277,23 +291,47 @@ def contacts_import():
                 c.execute("SELECT id FROM contacts WHERE phone=?", (phone,))
                 existing = c.fetchone()
                 if existing:
+                    skipped_duplicate += 1
                     continue
 
-                c.execute("""INSERT INTO contacts
+                c.execute("""
+                    INSERT INTO contacts
                     (name,phone,city,email,source,budget_band,buyer_type,preferred_asset,consent_status,hni_score,status,tags,notes,created_at)
-                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                    (name,phone,city,email,source,budget_band,buyer_type,preferred_asset,consent_status,score,"new",tags,notes,now()))
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                """, (
+                    name, phone, city, email, source, budget_band,
+                    buyer_type, preferred_asset, consent_status,
+                    score, "new", tags, notes, now()
+                ))
+
                 contact_id = c.lastrowid
-                c.execute("INSERT INTO conversations (contact_id,last_message,updated_at) VALUES (?,?,?)",
-                          (contact_id, "Conversation created", now()))
+
+                c.execute(
+                    "INSERT INTO conversations (contact_id,last_message,updated_at) VALUES (?,?,?)",
+                    (contact_id, "Conversation created", now())
+                )
                 conv_id = c.lastrowid
-                c.execute("INSERT INTO messages (conversation_id,sender,message_text,created_at) VALUES (?,?,?,?)",
-                          (conv_id, "system", f"Imported contact {name} from CSV.", now()))
+
+                c.execute(
+                    "INSERT INTO messages (conversation_id,sender,message_text,created_at) VALUES (?,?,?,?)",
+                    (conv_id, "system", f"Imported contact {name} from CSV.", now())
+                )
+
                 count += 1
+
             conn.commit()
             conn.close()
+
             imported = count
-            flash(f"Imported {count} contacts.")
+            print("IMPORTED:", count)
+            print("SKIPPED MISSING:", skipped_missing)
+            print("SKIPPED DUPLICATE:", skipped_duplicate)
+
+            flash(f"Imported {count} contacts. Skipped {skipped_missing} missing rows and {skipped_duplicate} duplicates.")
+
+        else:
+            flash("Invalid action selected.")
+
     return render_template("import_contacts.html", preview=preview, imported=imported)
 
 @app.route("/campaigns", methods=["GET","POST"])
@@ -461,5 +499,4 @@ def roi():
 
 if __name__ == "__main__":
     init_db()
-    import os
-app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
