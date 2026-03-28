@@ -524,3 +524,56 @@ def delete_contact(contact_id):
 
     flash("Contact deleted successfully.")
     return redirect(url_for("contacts"))
+@app.route("/contacts/edit/<int:contact_id>", methods=["GET", "POST"])
+def edit_contact(contact_id):
+    if not require_login():
+        return redirect(url_for("login"))
+
+    conn = get_db()
+    c = conn.cursor()
+
+    if request.method == "POST":
+        name = request.form.get("name", "").strip()
+        phone = request.form.get("phone", "").strip()
+        city = request.form.get("city", "").strip()
+        email = request.form.get("email", "").strip()
+        source = request.form.get("source", "").strip()
+        budget_band = request.form.get("budget_band", "").strip()
+        buyer_type = request.form.get("buyer_type", "").strip()
+        preferred_asset = request.form.get("preferred_asset", "").strip()
+        consent_status = request.form.get("consent_status", "").strip()
+        tags = request.form.get("tags", "").strip()
+        notes = request.form.get("notes", "").strip()
+
+        if not name or not phone:
+            conn.close()
+            flash("Name and phone are required.")
+            return redirect(url_for("edit_contact", contact_id=contact_id))
+
+        score = score_contact(name, city, budget_band, buyer_type, tags)
+
+        c.execute("""
+            UPDATE contacts
+            SET name=?, phone=?, city=?, email=?, source=?, budget_band=?, buyer_type=?,
+                preferred_asset=?, consent_status=?, hni_score=?, tags=?, notes=?
+            WHERE id=?
+        """, (
+            name, phone, city, email, source, budget_band, buyer_type,
+            preferred_asset, consent_status, score, tags, notes, contact_id
+        ))
+
+        conn.commit()
+        conn.close()
+
+        flash("Contact updated successfully.")
+        return redirect(url_for("contacts"))
+
+    c.execute("SELECT * FROM contacts WHERE id=?", (contact_id,))
+    contact = c.fetchone()
+    conn.close()
+
+    if not contact:
+        flash("Contact not found.")
+        return redirect(url_for("contacts"))
+
+    return render_template("edit_contact.html", contact=contact)
