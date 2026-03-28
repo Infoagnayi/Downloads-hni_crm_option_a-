@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block content %}
+<h2 class="fw-bold mb-3">Edit Contact</h2>
+
+<div class="card card-soft p-3">
+  <form method="post" class="row g-2">
+    <div class="col-md-3">
+      <input name="name" class="form-control" placeholder="Name" value="{{ contact.name }}" required>
+    </div>
+
+    <div class="col-md-3">
+      <input name="phone" class="form-control" placeholder="Phone" value="{{ contact.phone }}" required>
+    </div>
+
+    <div class="col-md-2">
+      <input name="city" class="form-control" placeholder="City" value="{{ contact.city }}">
+    </div>
+
+    <div class="col-md-4">
+      <input name="email" class="form-control" placeholder="Email" value="{{ contact.email }}">
+    </div>
+
+    <div class="col-md-2">
+      <input name="source" class="form-control" placeholder="Source" value="{{ contact.source }}">
+    </div>
+
+    <div class="col-md-2">
+      <input name="budget_band" class="form-control" placeholder="Budget band" value="{{ contact.budget_band }}">
+    </div>
+
+    <div class="col-md-2">
+      <input name="buyer_type" class="form-control" placeholder="Buyer type" value="{{ contact.buyer_type }}">
+    </div>
+
+    <div class="col-md-2">
+      <input name="preferred_asset" class="form-control" placeholder="Asset type" value="{{ contact.preferred_asset }}">
+    </div>
+
+    <div class="col-md-2">
+      <select name="consent_status" class="form-select">
+        <option value="opted_in" {% if contact.consent_status == "opted_in" %}selected{% endif %}>opted_in</option>
+        <option value="hold" {% if contact.consent_status == "hold" %}selected{% endif %}>hold</option>
+        <option value="Yes" {% if contact.consent_status == "Yes" %}selected{% endif %}>Yes</option>
+      </select>
+    </div>
+
+    <div class="col-md-2">
+      <input name="tags" class="form-control" placeholder="Tags" value="{{ contact.tags }}">
+    </div>
+
+    <div class="col-md-10">
+      <input name="notes" class="form-control" placeholder="Notes" value="{{ contact.notes }}">
+    </div>
+
+    <div class="col-md-2 d-flex gap-2">
+      <button type="submit" class="btn btn-primary w-100">Save</button>
+    </div>
+  </form>
+</div>
+{% endblock %}
