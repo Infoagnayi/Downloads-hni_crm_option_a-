@@ -7,10 +7,15 @@
 
 <div class="card card-soft p-3 mb-4">
   <form class="row g-2" method="get">
-    <div class="col-md-10"><input class="form-control" name="search" placeholder="Search name, city, phone or tags" value="{{ search }}"></div>
-    <div class="col-md-2"><button class="btn btn-primary w-100">Search</button></div>
+    <div class="col-md-10">
+      <input class="form-control" name="search" placeholder="Search name, city, phone or tags" value="{{ search }}">
+    </div>
+    <div class="col-md-2">
+      <button class="btn btn-primary w-100">Search</button>
+    </div>
   </form>
 </div>
+
 <div class="card card-soft p-3 mb-4">
   <h5 class="mb-3">Add contact</h5>
   <form method="post" class="row g-2">
@@ -38,119 +43,41 @@
   <div class="table-responsive">
     <table class="table align-middle">
       <thead>
-        <tr><th>Name</th><th>Phone</th><th>City</th><th>Buyer Type</th><th>Budget</th><th>Consent</th><th>Score</th><th>Status</th><th>Tags</th></tr>
+        <tr>
+          <th>Name</th>
+          <th>Phone</th>
+          <th>City</th>
+          <th>Buyer Type</th>
+          <th>Budget</th>
+          <th>Consent</th>
+          <th>Score</th>
+          <th>Status</th>
+          <th>Tags</th>
+          <th>Action</th>
+        </tr>
       </thead>
       <tbody>
         {% for c in contacts %}
-         <tr>
-  <td>{{ c.name }}</td>
-  <td>{{ c.phone }}</td>
-  <td>{{ c.city }}</td>
-  <td>{{ c.buyer_type }}</td>
-  <td>{{ c.budget_band }}</td>
-  <td>{{ c.consent_status }}</td>
-  <td><span class="badge badge-soft">{{ c.hni_score }}</span></td>
-  <td>{{ c.status }}</td>
-  <td>{{ c.tags }}</td>
-  <td>
-    <form method="post" action="{{ url_for('delete_contact', contact_id=c.id) }}" onsubmit="return confirm('Delete this contact?');">
-      <button type="submit" class="btn btn-sm btn-danger">Delete</button>
-    </form>
-  </td>
-</tr>        {% endfor %}
-   <tr>
-  <th>Name</th>
-  <th>Phone</th>
-  <th>City</th>
-  <th>Buyer Type</th>
-  <th>Budget</th>
-  <th>Consent</th>
-  <th>Score</th>
-  <th>Status</th>
-  <th>Tags</th>
-  <th>Action</th>
-</tr>
-<tr>
-  <td>{{ c.name }}</td>
-  <td>{{ c.phone }}</td>
-  <td>{{ c.city }}</td>
-  <td>{{ c.buyer_type }}</td>
-  <td>{{ c.budget_band }}</td>
-  <td>{{ c.consent_status }}</td>
-  <td><span class="badge badge-soft">{{ c.hni_score }}</span></td>
-  <td>{{ c.status }}</td>
-  <td>{{ c.tags }}</td>
-  <td class="d-flex gap-2">
-    <a href="{{ url_for('edit_contact', contact_id=c.id) }}" class="btn btn-sm btn-outline-primary">Edit</a>
-
-    <form method="post" action="{{ url_for('delete_contact', contact_id=c.id) }}" onsubmit="return confirm('Delete this contact?');">
-      <button type="submit" class="btn btn-sm btn-danger">Delete</button>
-    </form>
-  </td>
-</tr>
+        <tr>
+          <td>{{ c.name }}</td>
+          <td>{{ c.phone }}</td>
+          <td>{{ c.city }}</td>
+          <td>{{ c.buyer_type }}</td>
+          <td>{{ c.budget_band }}</td>
+          <td>{{ c.consent_status }}</td>
+          <td><span class="badge badge-soft">{{ c.hni_score }}</span></td>
+          <td>{{ c.status }}</td>
+          <td>{{ c.tags }}</td>
+          <td class="d-flex gap-2">
+            <a href="{{ url_for('edit_contact', contact_id=c.id) }}" class="btn btn-sm btn-outline-primary">Edit</a>
+            <form method="post" action="{{ url_for('delete_contact', contact_id=c.id) }}" onsubmit="return confirm('Delete this contact?');">
+              <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
       </tbody>
     </table>
   </div>
-</div>
-{% endblock %}
-
-{% extends "base.html" %}
-{% block content %}
-<h2 class="fw-bold mb-3">Edit Contact</h2>
-
-<div class="card card-soft p-3">
-  <form method="post" class="row g-2">
-    <div class="col-md-3">
-      <input name="name" class="form-control" placeholder="Name" value="{{ contact.name }}" required>
-    </div>
-
-    <div class="col-md-3">
-      <input name="phone" class="form-control" placeholder="Phone" value="{{ contact.phone }}" required>
-    </div>
-
-    <div class="col-md-2">
-      <input name="city" class="form-control" placeholder="City" value="{{ contact.city }}">
-    </div>
-
-    <div class="col-md-4">
-      <input name="email" class="form-control" placeholder="Email" value="{{ contact.email }}">
-    </div>
-
-    <div class="col-md-2">
-      <input name="source" class="form-control" placeholder="Source" value="{{ contact.source }}">
-    </div>
-
-    <div class="col-md-2">
-      <input name="budget_band" class="form-control" placeholder="Budget band" value="{{ contact.budget_band }}">
-    </div>
-
-    <div class="col-md-2">
-      <input name="buyer_type" class="form-control" placeholder="Buyer type" value="{{ contact.buyer_type }}">
-    </div>
-
-    <div class="col-md-2">
-      <input name="preferred_asset" class="form-control" placeholder="Asset type" value="{{ contact.preferred_asset }}">
-    </div>
-
-    <div class="col-md-2">
-      <select name="consent_status" class="form-select">
-        <option value="opted_in" {% if contact.consent_status == "opted_in" %}selected{% endif %}>opted_in</option>
-        <option value="hold" {% if contact.consent_status == "hold" %}selected{% endif %}>hold</option>
-        <option value="Yes" {% if contact.consent_status == "Yes" %}selected{% endif %}>Yes</option>
-      </select>
-    </div>
-
-    <div class="col-md-2">
-      <input name="tags" class="form-control" placeholder="Tags" value="{{ contact.tags }}">
-    </div>
-
-    <div class="col-md-10">
-      <input name="notes" class="form-control" placeholder="Notes" value="{{ contact.notes }}">
-    </div>
-
-    <div class="col-md-2 d-flex gap-2">
-      <button type="submit" class="btn btn-primary w-100">Save</button>
-    </div>
-  </form>
 </div>
 {% endblock %}
