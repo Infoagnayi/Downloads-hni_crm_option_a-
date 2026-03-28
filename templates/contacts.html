@@ -59,6 +59,36 @@
     </form>
   </td>
 </tr>        {% endfor %}
+   <tr>
+  <th>Name</th>
+  <th>Phone</th>
+  <th>City</th>
+  <th>Buyer Type</th>
+  <th>Budget</th>
+  <th>Consent</th>
+  <th>Score</th>
+  <th>Status</th>
+  <th>Tags</th>
+  <th>Action</th>
+</tr>
+<tr>
+  <td>{{ c.name }}</td>
+  <td>{{ c.phone }}</td>
+  <td>{{ c.city }}</td>
+  <td>{{ c.buyer_type }}</td>
+  <td>{{ c.budget_band }}</td>
+  <td>{{ c.consent_status }}</td>
+  <td><span class="badge badge-soft">{{ c.hni_score }}</span></td>
+  <td>{{ c.status }}</td>
+  <td>{{ c.tags }}</td>
+  <td class="d-flex gap-2">
+    <a href="{{ url_for('edit_contact', contact_id=c.id) }}" class="btn btn-sm btn-outline-primary">Edit</a>
+
+    <form method="post" action="{{ url_for('delete_contact', contact_id=c.id) }}" onsubmit="return confirm('Delete this contact?');">
+      <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+    </form>
+  </td>
+</tr>
       </tbody>
     </table>
   </div>
