@@ -1,18 +1,55 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash
-import sqlite3, os, csv, io, random
+import sqlite3, os, csv, io, random, requests
 from datetime import datetime
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
 app.secret_key = "change-me-in-production"
 DB_PATH = os.path.join(os.path.dirname(__file__), "crm.db")
 
+
 def get_db():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
+
 def now():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def clean_phone(phone):
+    return "".join(ch for ch in str(phone) if ch.isdigit())
+
+
+def send_whatsapp_text(to_phone, message_text):
+    access_token = os.environ.get("WHATSAPP_ACCESS_TOKEN")
+    phone_number_id = os.environ.get("WHATSAPP_PHONE_NUMBER_ID")
+    graph_version = os.environ.get("META_GRAPH_API_VERSION", "v22.0")
+
+    if not access_token or not phone_number_id:
+        raise Exception("Missing WhatsApp environment variables.")
+
+    url = f"https://graph.facebook.com/{graph_version}/{phone_number_id}/messages"
+
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json",
+    }
+
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": clean_phone(to_phone),
+        "type": "text",
+        "text": {
+            "body": message_text
+        }
+    }
+
+    response = requests.post(url, headers=headers, json=payload, timeout=30)
+    print("WHATSAPP STATUS:", response.status_code)
+    print("WHATSAPP RESPONSE:", response.text)
+    return response
+
 
 def init_db():
     conn = get_db()
@@ -88,50 +125,61 @@ def init_db():
     """)
     conn.commit()
 
-    # default user
     c.execute("SELECT COUNT(*) FROM users")
     if c.fetchone()[0] == 0:
-        c.execute("INSERT INTO users (email,password,name) VALUES (?,?,?)",
-                  ("admin@local.crm","admin123","Admin"))
+        c.execute(
+            "INSERT INTO users (email,password,name) VALUES (?,?,?)",
+            ("admin@local.crm", "admin123", "Admin")
+        )
 
-    # seed projects
     c.execute("SELECT COUNT(*) FROM projects")
     if c.fetchone()[0] == 0:
         projects = [
-            ("DLF The Arbour","DLF","Sector 63, Gurgaon","7–12 Cr","Low-density luxury, early-stage repricing, strong resale demand","18–22% in 3 years","https://example.com/brochure1"),
-            ("Oberoi Gurgaon Launch","Oberoi Realty","Gurgaon","6–10 Cr","Brand premium, first-entry buzz, likely strong investor pull","16–20% in 3 years","https://example.com/brochure2"),
-            ("Golf Course Extension Premium","Premium Developer","GCRE, Gurgaon","4–7 Cr","Infra tailwinds + premium inventory","15–18% in 3 years","https://example.com/brochure3"),
+            ("DLF The Arbour", "DLF", "Sector 63, Gurgaon", "7–12 Cr", "Low-density luxury, early-stage repricing, strong resale demand", "18–22% in 3 years", "https://example.com/brochure1"),
+            ("Oberoi Gurgaon Launch", "Oberoi Realty", "Gurgaon", "6–10 Cr", "Brand premium, first-entry buzz, likely strong investor pull", "16–20% in 3 years", "https://example.com/brochure2"),
+            ("Golf Course Extension Premium", "Premium Developer", "GCRE, Gurgaon", "4–7 Cr", "Infra tailwinds + premium inventory", "15–18% in 3 years", "https://example.com/brochure3"),
         ]
-        c.executemany("""INSERT INTO projects
-            (name,developer,location,ticket_size,appreciation_thesis,expected_roi,brochure_link)
-            VALUES (?,?,?,?,?,?,?)""", projects)
+        c.executemany(
+            """INSERT INTO projects
+               (name,developer,location,ticket_size,appreciation_thesis,expected_roi,brochure_link)
+               VALUES (?,?,?,?,?,?,?)""",
+            projects
+        )
 
-    # seed contacts
     c.execute("SELECT COUNT(*) FROM contacts")
     if c.fetchone()[0] == 0:
         contacts = [
-            ("Aman Khanna","+919999000001","Delhi","aman.khanna@example.com","Referral","5-7 Cr","investor","apartment","opted_in",91,"hot","gcre,investor","Interested in appreciation-led options",now()),
-            ("Rhea Mehta","+919999000002","Mumbai","rhea.mehta@example.com","Instagram Lead","7-15 Cr","nri","apartment","opted_in",88,"contacted","nri,luxury","Asked for ROI deck",now()),
-            ("Kabir Sethi","+919999000003","Gurgaon","kabir.sethi@example.com","Website","3-5 Cr","end-user","floor","opted_in",74,"new","end-user","Looking at move-in timeline 6 months",now()),
+            ("Aman Khanna", "+919999000001", "Delhi", "aman.khanna@example.com", "Referral", "5-7 Cr", "investor", "apartment", "opted_in", 91, "hot", "gcre,investor", "Interested in appreciation-led options", now()),
+            ("Rhea Mehta", "+919999000002", "Mumbai", "rhea.mehta@example.com", "Instagram Lead", "7-15 Cr", "nri", "apartment", "opted_in", 88, "contacted", "nri,luxury", "Asked for ROI deck", now()),
+            ("Kabir Sethi", "+919999000003", "Gurgaon", "kabir.sethi@example.com", "Website", "3-5 Cr", "end-user", "floor", "opted_in", 74, "new", "end-user", "Looking at move-in timeline 6 months", now()),
         ]
-        c.executemany("""INSERT INTO contacts
-        (name,phone,city,email,source,budget_band,buyer_type,preferred_asset,consent_status,hni_score,status,tags,notes,created_at)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", contacts)
+        c.executemany(
+            """INSERT INTO contacts
+               (name,phone,city,email,source,budget_band,buyer_type,preferred_asset,consent_status,hni_score,status,tags,notes,created_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            contacts
+        )
         conn.commit()
 
-        # seed conversations
         c.execute("SELECT id, name FROM contacts")
         for row in c.fetchall():
-            c.execute("INSERT INTO conversations (contact_id,last_message,updated_at) VALUES (?,?,?)",
-                      (row["id"], f"Started thread with {row['name']}", now()))
+            c.execute(
+                "INSERT INTO conversations (contact_id,last_message,updated_at) VALUES (?,?,?)",
+                (row["id"], f"Started thread with {row['name']}", now())
+            )
             conv_id = c.lastrowid
-            c.execute("INSERT INTO messages (conversation_id,sender,message_text,created_at) VALUES (?,?,?,?)",
-                      (conv_id, "system", f"Lead imported and conversation created for {row['name']}.", now()))
+            c.execute(
+                "INSERT INTO messages (conversation_id,sender,message_text,created_at) VALUES (?,?,?,?)",
+                (conv_id, "system", f"Lead imported and conversation created for {row['name']}.", now())
+            )
         conn.commit()
+
     conn.close()
+
 
 def require_login():
     return "user_id" in session
+
 
 def score_contact(name, city, budget_band, buyer_type, tags):
     score = 40
@@ -141,9 +189,10 @@ def score_contact(name, city, budget_band, buyer_type, tags):
         score += 15
     if city and city.lower() in ["delhi", "gurgaon", "mumbai", "dubai", "london", "singapore"]:
         score += 10
-    if tags and any(k in tags.lower() for k in ["luxury","business","founder","investor","nri"]):
+    if tags and any(k in tags.lower() for k in ["luxury", "business", "founder", "investor", "nri"]):
         score += 10
     return min(score, 99)
+
 
 @app.route("/")
 def index():
@@ -164,15 +213,22 @@ def index():
     c.execute("SELECT * FROM campaigns ORDER BY id DESC LIMIT 5")
     recent_campaigns = c.fetchall()
     conn.close()
-    return render_template("dashboard.html", total_contacts=total_contacts, hot_leads=hot_leads,
-                           conversations=conversations, campaigns=campaigns,
-                           top_contacts=top_contacts, recent_campaigns=recent_campaigns)
+    return render_template(
+        "dashboard.html",
+        total_contacts=total_contacts,
+        hot_leads=hot_leads,
+        conversations=conversations,
+        campaigns=campaigns,
+        top_contacts=top_contacts,
+        recent_campaigns=recent_campaigns,
+    )
 
-@app.route("/login", methods=["GET","POST"])
+
+@app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        email = request.form.get("email","").strip()
-        password = request.form.get("password","").strip()
+        email = request.form.get("email", "").strip()
+        password = request.form.get("password", "").strip()
         conn = get_db()
         c = conn.cursor()
         c.execute("SELECT * FROM users WHERE email=? AND password=?", (email, password))
@@ -185,58 +241,77 @@ def login():
         flash("Invalid login details.")
     return render_template("login.html")
 
+
 @app.route("/logout")
 def logout():
     session.clear()
     return redirect(url_for("login"))
 
-@app.route("/contacts", methods=["GET","POST"])
+
+@app.route("/contacts", methods=["GET", "POST"])
 def contacts():
     if not require_login():
         return redirect(url_for("login"))
+
     conn = get_db()
     c = conn.cursor()
+
     if request.method == "POST":
-        name = request.form.get("name","").strip()
-        phone = request.form.get("phone","").strip()
-        city = request.form.get("city","").strip()
-        email = request.form.get("email","").strip()
-        source = request.form.get("source","Manual").strip()
-        budget_band = request.form.get("budget_band","").strip()
-        buyer_type = request.form.get("buyer_type","").strip()
-        preferred_asset = request.form.get("preferred_asset","").strip()
-        consent_status = request.form.get("consent_status","opted_in").strip()
-        tags = request.form.get("tags","").strip()
-        notes = request.form.get("notes","").strip()
+        name = request.form.get("name", "").strip()
+        phone = request.form.get("phone", "").strip()
+        city = request.form.get("city", "").strip()
+        email = request.form.get("email", "").strip()
+        source = request.form.get("source", "Manual").strip()
+        budget_band = request.form.get("budget_band", "").strip()
+        buyer_type = request.form.get("buyer_type", "").strip()
+        preferred_asset = request.form.get("preferred_asset", "").strip()
+        consent_status = request.form.get("consent_status", "opted_in").strip()
+        tags = request.form.get("tags", "").strip()
+        notes = request.form.get("notes", "").strip()
+
         score = score_contact(name, city, budget_band, buyer_type, tags)
-        c.execute("""INSERT INTO contacts
-            (name,phone,city,email,source,budget_band,buyer_type,preferred_asset,consent_status,hni_score,status,tags,notes,created_at)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-            (name,phone,city,email,source,budget_band,buyer_type,preferred_asset,consent_status,score,"new",tags,notes,now()))
+
+        c.execute(
+            """INSERT INTO contacts
+               (name,phone,city,email,source,budget_band,buyer_type,preferred_asset,consent_status,hni_score,status,tags,notes,created_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (name, phone, city, email, source, budget_band, buyer_type, preferred_asset, consent_status, score, "new", tags, notes, now())
+        )
         contact_id = c.lastrowid
-        c.execute("INSERT INTO conversations (contact_id,last_message,updated_at) VALUES (?,?,?)",
-                  (contact_id, "Conversation created", now()))
+
+        c.execute(
+            "INSERT INTO conversations (contact_id,last_message,updated_at) VALUES (?,?,?)",
+            (contact_id, "Conversation created", now())
+        )
         conv_id = c.lastrowid
-        c.execute("INSERT INTO messages (conversation_id,sender,message_text,created_at) VALUES (?,?,?,?)",
-                  (conv_id, "system", f"New contact {name} added.", now()))
+
+        c.execute(
+            "INSERT INTO messages (conversation_id,sender,message_text,created_at) VALUES (?,?,?,?)",
+            (conv_id, "system", f"New contact {name} added.", now())
+        )
+
         conn.commit()
-        flash("Contact added.")
         conn.close()
+        flash("Contact added.")
         return redirect(url_for("contacts"))
 
-    search = request.args.get("search","").strip()
+    search = request.args.get("search", "").strip()
     if search:
-        c.execute("""SELECT * FROM contacts
-                     WHERE name LIKE ? OR city LIKE ? OR phone LIKE ? OR tags LIKE ?
-                     ORDER BY hni_score DESC, id DESC""",
-                  (f"%{search}%", f"%{search}%", f"%{search}%", f"%{search}%"))
+        c.execute(
+            """SELECT * FROM contacts
+               WHERE name LIKE ? OR city LIKE ? OR phone LIKE ? OR tags LIKE ?
+               ORDER BY hni_score DESC, id DESC""",
+            (f"%{search}%", f"%{search}%", f"%{search}%", f"%{search}%")
+        )
     else:
         c.execute("SELECT * FROM contacts ORDER BY hni_score DESC, id DESC")
+
     rows = c.fetchall()
     conn.close()
     return render_template("contacts.html", contacts=rows, search=search)
 
-@app.route("/contacts/import", methods=["GET","POST"])
+
+@app.route("/contacts/import", methods=["GET", "POST"])
 def contacts_import():
     if not require_login():
         return redirect(url_for("login"))
@@ -250,14 +325,24 @@ def contacts_import():
             flash("Please upload a CSV file.")
             return redirect(url_for("contacts_import"))
 
-        content = file.read().decode("utf-8", errors="ignore")
+        content = file.read().decode("utf-8-sig", errors="ignore")
+
+        sample = content[:1024]
+        try:
+            dialect = csv.Sniffer().sniff(sample, delimiters=",\t;")
+            delimiter = dialect.delimiter
+        except Exception:
+            delimiter = ","
+
         stream = io.StringIO(content)
-        reader = csv.DictReader(stream)
+        reader = csv.DictReader(stream, delimiter=delimiter)
         rows = list(reader)
 
         action = request.form.get("action", "").strip().lower()
         print("ACTION:", action)
+        print("DETECTED DELIMITER:", repr(delimiter))
         print("TOTAL ROWS READ:", len(rows))
+        print("HEADERS:", reader.fieldnames)
 
         if action == "preview":
             preview = rows[:10]
@@ -294,15 +379,16 @@ def contacts_import():
                     skipped_duplicate += 1
                     continue
 
-                c.execute("""
-                    INSERT INTO contacts
-                    (name,phone,city,email,source,budget_band,buyer_type,preferred_asset,consent_status,hni_score,status,tags,notes,created_at)
-                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-                """, (
-                    name, phone, city, email, source, budget_band,
-                    buyer_type, preferred_asset, consent_status,
-                    score, "new", tags, notes, now()
-                ))
+                c.execute(
+                    """INSERT INTO contacts
+                       (name,phone,city,email,source,budget_band,buyer_type,preferred_asset,consent_status,hni_score,status,tags,notes,created_at)
+                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    (
+                        name, phone, city, email, source, budget_band,
+                        buyer_type, preferred_asset, consent_status,
+                        score, "new", tags, notes, now()
+                    )
+                )
 
                 contact_id = c.lastrowid
 
@@ -334,33 +420,42 @@ def contacts_import():
 
     return render_template("import_contacts.html", preview=preview, imported=imported)
 
-@app.route("/campaigns", methods=["GET","POST"])
+
+@app.route("/campaigns", methods=["GET", "POST"])
 def campaigns():
     if not require_login():
         return redirect(url_for("login"))
+
     conn = get_db()
     c = conn.cursor()
+
     if request.method == "POST":
-        name = request.form.get("name","").strip()
-        segment = request.form.get("segment","all").strip()
-        template_text = request.form.get("template_text","").strip()
-        c.execute("INSERT INTO campaigns (name,segment,template_text,status,created_at) VALUES (?,?,?,?,?)",
-                  (name,segment,template_text,"draft",now()))
+        name = request.form.get("name", "").strip()
+        segment = request.form.get("segment", "all").strip()
+        template_text = request.form.get("template_text", "").strip()
+        c.execute(
+            "INSERT INTO campaigns (name,segment,template_text,status,created_at) VALUES (?,?,?,?,?)",
+            (name, segment, template_text, "draft", now())
+        )
         conn.commit()
-        flash("Campaign created.")
         conn.close()
+        flash("Campaign created.")
         return redirect(url_for("campaigns"))
+
     c.execute("SELECT * FROM campaigns ORDER BY id DESC")
     rows = c.fetchall()
     conn.close()
     return render_template("campaigns.html", campaigns=rows)
 
+
 @app.route("/campaigns/<int:campaign_id>/launch")
 def launch_campaign(campaign_id):
     if not require_login():
         return redirect(url_for("login"))
+
     conn = get_db()
     c = conn.cursor()
+
     c.execute("SELECT * FROM campaigns WHERE id=?", (campaign_id,))
     campaign = c.fetchone()
     if not campaign:
@@ -377,24 +472,32 @@ def launch_campaign(campaign_id):
         c.execute("SELECT * FROM contacts WHERE buyer_type='nri' AND consent_status='opted_in'")
     else:
         c.execute("SELECT * FROM contacts WHERE consent_status='opted_in'")
-    contacts = c.fetchall()
 
+    contacts = c.fetchall()
     sent = 0
+
     for contact in contacts:
         c.execute("SELECT * FROM conversations WHERE contact_id=?", (contact["id"],))
         conv = c.fetchone()
+
         if not conv:
-            c.execute("INSERT INTO conversations (contact_id,last_message,updated_at) VALUES (?,?,?)",
-                      (contact["id"], "Campaign conversation", now()))
+            c.execute(
+                "INSERT INTO conversations (contact_id,last_message,updated_at) VALUES (?,?,?)",
+                (contact["id"], "Campaign conversation", now())
+            )
             conv_id = c.lastrowid
         else:
             conv_id = conv["id"]
 
         message = campaign["template_text"].replace("{name}", contact["name"]).replace("{city}", contact["city"] or "")
-        c.execute("INSERT INTO messages (conversation_id,sender,message_text,created_at) VALUES (?,?,?,?)",
-                  (conv_id, "campaign", message, now()))
-        c.execute("UPDATE conversations SET last_message=?, updated_at=? WHERE id=?",
-                  (message, now(), conv_id))
+        c.execute(
+            "INSERT INTO messages (conversation_id,sender,message_text,created_at) VALUES (?,?,?,?)",
+            (conv_id, "campaign", message, now())
+        )
+        c.execute(
+            "UPDATE conversations SET last_message=?, updated_at=? WHERE id=?",
+            (message, now(), conv_id)
+        )
         sent += 1
 
     c.execute("UPDATE campaigns SET status='launched' WHERE id=?", (campaign_id,))
@@ -403,30 +506,40 @@ def launch_campaign(campaign_id):
     flash(f"Campaign launched to {sent} opted-in contacts.")
     return redirect(url_for("campaigns"))
 
+
 @app.route("/inbox")
 def inbox():
     if not require_login():
         return redirect(url_for("login"))
+
     conn = get_db()
     c = conn.cursor()
-    c.execute("""SELECT conversations.*, contacts.name AS contact_name, contacts.city, contacts.hni_score
-                 FROM conversations
-                 JOIN contacts ON contacts.id = conversations.contact_id
-                 ORDER BY conversations.updated_at DESC""")
+    c.execute(
+        """SELECT conversations.*, contacts.name AS contact_name, contacts.city, contacts.hni_score
+           FROM conversations
+           JOIN contacts ON contacts.id = conversations.contact_id
+           ORDER BY conversations.updated_at DESC"""
+    )
     conversations = c.fetchall()
+
     selected_id = request.args.get("conversation_id")
     selected = None
     messages = []
     ai_suggestion = ""
+
     if selected_id:
-        c.execute("""SELECT conversations.*, contacts.name AS contact_name, contacts.city, contacts.budget_band,
-                            contacts.buyer_type, contacts.hni_score, contacts.tags
-                     FROM conversations
-                     JOIN contacts ON contacts.id = conversations.contact_id
-                     WHERE conversations.id=?""", (selected_id,))
+        c.execute(
+            """SELECT conversations.*, contacts.name AS contact_name, contacts.city, contacts.budget_band,
+                      contacts.buyer_type, contacts.hni_score, contacts.tags
+               FROM conversations
+               JOIN contacts ON contacts.id = conversations.contact_id
+               WHERE conversations.id=?""",
+            (selected_id,)
+        )
         selected = c.fetchone()
         c.execute("SELECT * FROM messages WHERE conversation_id=? ORDER BY id ASC", (selected_id,))
         messages = c.fetchall()
+
         if selected:
             ai_suggestion = (
                 f"Hi {selected['contact_name'].split()[0]}, based on your {selected['budget_band']} profile, "
@@ -435,31 +548,79 @@ def inbox():
             )
     elif conversations:
         first_id = conversations[0]["id"]
+        conn.close()
         return redirect(url_for("inbox", conversation_id=first_id))
+
     conn.close()
     return render_template("inbox.html", conversations=conversations, selected=selected, messages=messages, ai_suggestion=ai_suggestion)
+
 
 @app.route("/inbox/<int:conversation_id>/send", methods=["POST"])
 def send_message(conversation_id):
     if not require_login():
         return redirect(url_for("login"))
-    text = request.form.get("message_text","").strip()
-    if text:
-        conn = get_db()
-        c = conn.cursor()
-        c.execute("INSERT INTO messages (conversation_id,sender,message_text,created_at) VALUES (?,?,?,?)",
-                  (conversation_id, "advisor", text, now()))
-        c.execute("UPDATE conversations SET last_message=?, updated_at=? WHERE id=?",
-                  (text, now(), conversation_id))
-        conn.commit()
+
+    text = request.form.get("message_text", "").strip()
+    if not text:
+        flash("Please enter a message.")
+        return redirect(url_for("inbox", conversation_id=conversation_id))
+
+    conn = get_db()
+    c = conn.cursor()
+
+    c.execute(
+        """SELECT contacts.phone, contacts.name
+           FROM conversations
+           JOIN contacts ON conversations.contact_id = contacts.id
+           WHERE conversations.id = ?""",
+        (conversation_id,)
+    )
+    contact = c.fetchone()
+
+    if not contact:
         conn.close()
-        flash("Message sent in local inbox.")
+        flash("Conversation/contact not found.")
+        return redirect(url_for("inbox"))
+
+    contact_phone = contact["phone"] if hasattr(contact, "keys") else contact[0]
+
+    whatsapp_sent = False
+    whatsapp_error = None
+
+    try:
+        wa_response = send_whatsapp_text(contact_phone, text)
+        if wa_response.status_code in [200, 201]:
+            whatsapp_sent = True
+        else:
+            whatsapp_error = wa_response.text
+    except Exception as e:
+        whatsapp_error = str(e)
+
+    c.execute(
+        "INSERT INTO messages (conversation_id,sender,message_text,created_at) VALUES (?,?,?,?)",
+        (conversation_id, "advisor", text, now())
+    )
+    c.execute(
+        "UPDATE conversations SET last_message=?, updated_at=? WHERE id=?",
+        (text, now(), conversation_id)
+    )
+
+    conn.commit()
+    conn.close()
+
+    if whatsapp_sent:
+        flash("Message sent to WhatsApp and saved in inbox.")
+    else:
+        flash(f"Message saved in inbox, but WhatsApp send failed. {whatsapp_error}")
+
     return redirect(url_for("inbox", conversation_id=conversation_id))
+
 
 @app.route("/projects")
 def projects():
     if not require_login():
         return redirect(url_for("login"))
+
     conn = get_db()
     c = conn.cursor()
     c.execute("SELECT * FROM projects ORDER BY id DESC")
@@ -467,10 +628,12 @@ def projects():
     conn.close()
     return render_template("projects.html", projects=rows)
 
-@app.route("/roi", methods=["GET","POST"])
+
+@app.route("/roi", methods=["GET", "POST"])
 def roi():
     if not require_login():
         return redirect(url_for("login"))
+
     conn = get_db()
     c = conn.cursor()
     c.execute("SELECT id,name FROM contacts ORDER BY name")
@@ -478,28 +641,32 @@ def roi():
     c.execute("SELECT id,name,expected_roi FROM projects ORDER BY name")
     projects = c.fetchall()
     result = None
+
     if request.method == "POST":
         contact_id = int(request.form.get("contact_id"))
         project_id = int(request.form.get("project_id"))
         purchase_price = float(request.form.get("purchase_price"))
         years = int(request.form.get("years"))
         growth = float(request.form.get("growth_rate"))
-        expected_exit_value = round(purchase_price * ((1 + growth/100) ** years), 2)
+
+        expected_exit_value = round(purchase_price * ((1 + growth / 100) ** years), 2)
         profit = round(expected_exit_value - purchase_price, 2)
-        irr = round((((expected_exit_value / purchase_price) ** (1/years)) - 1) * 100, 2)
-        c.execute("""INSERT INTO roi_calculations
-                  (contact_id,project_id,purchase_price,years,expected_exit_value,profit,irr,created_at)
-                  VALUES (?,?,?,?,?,?,?,?)""",
-                  (contact_id, project_id, purchase_price, years, expected_exit_value, profit, irr, now()))
+        irr = round((((expected_exit_value / purchase_price) ** (1 / years)) - 1) * 100, 2)
+
+        c.execute(
+            """INSERT INTO roi_calculations
+               (contact_id,project_id,purchase_price,years,expected_exit_value,profit,irr,created_at)
+               VALUES (?,?,?,?,?,?,?,?)""",
+            (contact_id, project_id, purchase_price, years, expected_exit_value, profit, irr, now())
+        )
         conn.commit()
         result = {"expected_exit_value": expected_exit_value, "profit": profit, "irr": irr}
         flash("ROI calculation saved.")
+
     conn.close()
     return render_template("roi.html", contacts=contacts, projects=projects, result=result)
 
-if __name__ == "__main__":
-    init_db()
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+
 @app.route("/contacts/delete/<int:contact_id>", methods=["POST"])
 def delete_contact(contact_id):
     if not require_login():
@@ -508,7 +675,6 @@ def delete_contact(contact_id):
     conn = get_db()
     c = conn.cursor()
 
-    # delete related records first
     c.execute("SELECT id FROM conversations WHERE contact_id=?", (contact_id,))
     convs = c.fetchall()
 
@@ -524,6 +690,8 @@ def delete_contact(contact_id):
 
     flash("Contact deleted successfully.")
     return redirect(url_for("contacts"))
+
+
 @app.route("/contacts/edit/<int:contact_id>", methods=["GET", "POST"])
 def edit_contact(contact_id):
     if not require_login():
@@ -552,15 +720,16 @@ def edit_contact(contact_id):
 
         score = score_contact(name, city, budget_band, buyer_type, tags)
 
-        c.execute("""
-            UPDATE contacts
-            SET name=?, phone=?, city=?, email=?, source=?, budget_band=?, buyer_type=?,
-                preferred_asset=?, consent_status=?, hni_score=?, tags=?, notes=?
-            WHERE id=?
-        """, (
-            name, phone, city, email, source, budget_band, buyer_type,
-            preferred_asset, consent_status, score, tags, notes, contact_id
-        ))
+        c.execute(
+            """UPDATE contacts
+               SET name=?, phone=?, city=?, email=?, source=?, budget_band=?, buyer_type=?,
+                   preferred_asset=?, consent_status=?, hni_score=?, tags=?, notes=?
+               WHERE id=?""",
+            (
+                name, phone, city, email, source, budget_band, buyer_type,
+                preferred_asset, consent_status, score, tags, notes, contact_id
+            )
+        )
 
         conn.commit()
         conn.close()
@@ -577,3 +746,8 @@ def edit_contact(contact_id):
         return redirect(url_for("contacts"))
 
     return render_template("edit_contact.html", contact=contact)
+
+
+if __name__ == "__main__":
+    init_db()
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
